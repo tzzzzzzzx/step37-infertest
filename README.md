@@ -5,10 +5,16 @@
 - Step-3.7-Flash（step35 架构：196.96B MoE / 11B 激活，288 专家 top-8 + shared，12 层全注意力 + 33 层 SWA-512）
 - 权重：Step-3.7-Flash-ARA-Heretic（PeterCxy 解锁版，IQ4_XS 三分卷 97.78 GiB）
 
-## 配置
+## 配置与代码构成
 
 - 硬件：RTX 4080 SUPER 32G（sm_89）+ EPYC 7R12 48 核 / 8 通道 DDR4-2400，单卡单副本，全程未换硬件
-- 引擎：CUDA 13.2；自研调度编排（strata 底座 + vendored llama.cpp 算子）
+- **代码血缘（如实声明）**：这不是从零写的引擎。**算术算子层大量复用现成实现**——量化算术
+  （IQ4_XS/Q5_K/Q6_K/Q8_0 块布局与 vec_dot）来自 llama.cpp 的 ggml-cuda MMQ 子集（MIT，
+  vendored 于 `vendor/`）；CPU 专家 lane 复用 strata 的 ggml-cpu 委托；嵌入/rope/norm 等
+  基础 kernel 来自 strata kernels。**原创部分是调度与编排**：自定义 GGUF 直读、prefill
+  staging 预取环、专家池 LFU、q8 KV 环形寻址、OP 分相 daemon、前缀会话复用、设备端路由
+  派发——约 3.4K 行自写调度代码，把现成算子搬进一个反 ggml 调度模型的执行序列。
+- 引擎运行时：CUDA 13.2 + cuBLAS
   - q8_0 KV 环形寻址：全注意力层 262144 / SWA 层 4096（位掩码，cap 恒 2 的幂）
   - prefill：cuBLAS FP16 投影 + mma.sync flash attention + 设备端路由派发 + 双槽 staging 预取
   - decode：分段 flash attention + 专家池 LFU（选装）+ CPU lane work-stealing

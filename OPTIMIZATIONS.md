@@ -1,6 +1,8 @@
 # 具体优化点
 
 基线：llama.cpp stock（ngl 99 / 尾 35 层专家进 CPU / ub512）prefill 122.3 / decode 28.97 t/s @50K。
+声明：下列优化的算术算子多来自 vendored llama.cpp 与 strata kernels（见 README 代码血缘）；
+本文件的"优化"指调度编排层的搬运与改配——哪里换成现成件、哪里重排执行，均实测标注。
 首跑（朴素路径）：4.2 / 4.2 t/s。方法：先量硬件峰值（FP16 TC ~104T / INT8 TC ~208T / PCIe pinned 26GB/s /
 DRAM 98.9GB/s / VRAM 736GB/s），把每个工作单元搬到边际速率最高的部件上，每搬一次重签数值契约，每轮重测。
 
